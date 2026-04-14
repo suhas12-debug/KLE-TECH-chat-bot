@@ -5,9 +5,42 @@ import os
 import re
 import json
 import random
+import sys
+import time
 
 from vocab_builder import load_vocab, VocabBuilder, PAD_token, SOS_token, EOS_token, UNK_token
 from transformer_model import Seq2SeqTransformer, create_mask, generate_square_subsequent_mask
+
+# --- ANSI Color Codes ---
+CLR_BLUE = "\033[1;34m"
+CLR_CYAN = "\033[1;36m"
+CLR_GREEN = "\033[0;32m"
+CLR_YELLOW = "\033[1;33m"
+CLR_RESET = "\033[0m"
+
+def typing_print(prefix, text):
+    """Prints text with a typing effect."""
+    sys.stdout.write(prefix)
+    sys.stdout.flush()
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(0.01) # Speed of typing
+    sys.stdout.write("\n\n")
+    sys.stdout.flush()
+
+def print_logo():
+    logo = f"""
+{CLR_BLUE}  _  _______      _____ _____  _____ _    _ 
+ | |/ /  __ \    / ____|  __ \|_   _| |  | |
+ | ' /| |__) |  | |  __| |__) | | | | |  | |
+ |  < |  ___/   | | |_ |  _  /  | | | |  | |
+ | . \| |       | |__| | | \ \ _| |_| |__| |
+ |_|\_\_|        \_____|_|  \_\_____|\____/ {CLR_RESET}
+    
+ {CLR_YELLOW}>>> Custom Seq2Seq Transformer Chatbot{CLR_RESET}
+    """
+    print(logo)
 
 # Hyperparameters must match the trained model
 EMB_SIZE = 128
@@ -206,34 +239,40 @@ def main():
     if model is None:
         return
         
-    print("="*55)
-    print("  🎓 KLE Tech Bot — Custom Transformer Chatbot")
-    print("  (Type 'quit' or 'exit' to stop)")
-    print("="*55 + "\n")
+    print_logo()
+    print(f"{CLR_YELLOW}Initializing University Knowledge Grid...{CLR_RESET}")
+    print(f"{CLR_GREEN}Bot Ready!{CLR_RESET} (Type '{CLR_YELLOW}quit{CLR_RESET}' or '{CLR_YELLOW}exit{CLR_RESET}' to stop)\n")
     
     while True:
         try:
-            user_input = input("You: ")
+            print(f"{CLR_CYAN}You:{CLR_RESET} ", end="")
+            user_input = input()
+            
             if user_input.lower().strip() in ["quit", "exit", "q"]:
-                print("Bot: Goodbye! 👋\n")
+                print(f"{CLR_BLUE}Bot:{CLR_RESET} Goodbye! 👋\n")
                 break
                 
             if not user_input.strip():
                 continue
             
-            # Step 1: Check if the question is similar enough to anything we know
+            # Step 1: Matching
             best_score, best_match = find_best_match(user_input, known_questions, vectorizer, tfidf_matrix)
             
+            sys.stdout.write(f"{CLR_BLUE}Bot is thinking")
+            for _ in range(3):
+                time.sleep(0.2)
+                sys.stdout.write(".")
+                sys.stdout.flush()
+            sys.stdout.write("\r" + " " * 20 + "\r") # Clear thinking line
+            
             if best_score < SIMILARITY_THRESHOLD:
-                # Question is too far from anything in our dataset
-                print(f"Bot: {random.choice(FALLBACK_RESPONSES)}\n")
+                typing_print(f"{CLR_BLUE}Bot:{CLR_RESET} ", random.choice(FALLBACK_RESPONSES))
             else:
-                # Step 2: Generate response using the Transformer (use best match to avoid hallucination on rephrasing)
                 response = generate_response(model, vocab, best_match)
-                print(f"Bot: {response}\n")
+                typing_print(f"{CLR_BLUE}Bot:{CLR_RESET} ", response)
             
         except KeyboardInterrupt:
-            print("\nBot: Session terminated. Goodbye! 👋")
+            print(f"\n{CLR_BLUE}Bot:{CLR_RESET} Session terminated. Goodbye! 👋")
             break
         except Exception as e:
             print(f"Error: {e}")
