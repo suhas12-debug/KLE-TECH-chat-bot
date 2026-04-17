@@ -270,6 +270,68 @@ ESA_DATES = [
      "[ACADEMIC]: For 4th Sem BBA, BCA, B.Com students: Practical Exams 12th-16th June 2026, Theory Exams from 19th June 2026."),
 ]
 
+# ---------------- Registration ----------------
+REGISTRATION = [
+    (["When is registration day?", "Registration date for even semester?", "When does the semester start?"],
+     "[CALENDAR]: Registration Day is on 16th February 2026. The even semester (2025-26) term commences from 16th February 2026."),
+    (["Last date for registration?", "Deadline for semester registration?", "Till when can I register?"],
+     "[CALENDAR]: The last date for registration is 23rd February 2026."),
+]
+
+# ---------------- Minor Exams ----------------
+MINOR_EXAMS = [
+    (["When is Minor 1?", "Minor 1 exam dates?", "When is the first minor exam?", "Minor 1 schedule?"],
+     "[CALENDAR]: Minor-1 exams are on 26th, 27th & 28th March 2026."),
+    (["When is Minor 1 make-up exam?", "Make-up Minor 1 dates?", "Can I retake Minor 1?"],
+     "[CALENDAR]: Make-Up Minor-1 exams are from 2nd to 7th April 2026. Last date to apply for Make-Up Minor-1 is 1st April 2026."),
+    (["When is Minor 1 marks display?", "Minor 1 results?", "When will Minor 1 marks be released?"],
+     "[CALENDAR]: Minor-1 Marks Display is on 6th April 2026."),
+    (["When is Minor 2?", "Minor 2 exam dates?", "When is the second minor exam?", "Minor 2 schedule?"],
+     "[CALENDAR]: Minor-2 exams are on 18th, 19th & 20th May 2026."),
+    (["When is Minor 2 make-up exam?", "Make-up Minor 2 dates?", "Can I retake Minor 2?"],
+     "[CALENDAR]: Make-Up Minor-2 exams are from 23rd to 27th May 2026. Last date to apply for Make-Up Minor-2 is 22nd May 2026."),
+    (["When is Minor 2 marks display?", "Minor 2 results?", "When will Minor 2 marks be released?"],
+     "[CALENDAR]: Minor-2 Marks Display is on 26th May 2026."),
+]
+
+# ---------------- Academic Events ----------------
+ACADEMIC_EVENTS = [
+    (["When is monthly attendance report?", "Attendance report dates?", "When are attendance reports published?"],
+     "[CALENDAR]: Monthly attendance reports are on 2nd March, 1st April, and 2nd May 2026."),
+    (["When is class committee meeting?", "Class committee meeting dates?", "CCM dates?"],
+     "[CALENDAR]: Class Committee Meeting-1 is on 9th & 10th March 2026. Meeting-2 is on 10th & 11th April 2026. Meeting-3 is on 11th & 12th May 2026."),
+    (["When is student counselling?", "Student counselling dates?", "Counselling sessions?"],
+     "[CALENDAR]: Student Counselling-1 is from 30th March to 7th April 2026. Student Counselling-2 is from 25th May to 1st June 2026."),
+    (["Last date to drop a course?", "Course dropping deadline?", "When can I drop a course?"],
+     "[CALENDAR]: Last date for course(s) dropping is 10th April 2026."),
+    (["Last date for course withdrawal?", "Course withdrawal deadline?", "When can I withdraw from a course?"],
+     "[CALENDAR]: Last date for course(s) withdrawal is 1st June 2026."),
+    (["When is final attendance?", "Final marks display date?", "Last day of classes?"],
+     "[CALENDAR]: Final attendance / Marks display is on 9th June 2026."),
+    (["When is Pleiades?", "Pleiades fest dates?", "College fest dates?", "When is the college cultural fest?"],
+     "[CALENDAR]: Pleiades (college fest) is from 8th to 10th May 2026."),
+    (["When are working day swaps?", "Friday timetable on which day?", "Saturday timetable on which day?"],
+     "[CALENDAR]: Working with Friday Time Table on 14th March 2026 (Saturday). Working with Saturday Time Table on 15th March 2026."),
+]
+
+# ---------------- Feedback Dates ----------------
+FEEDBACK = [
+    (["When is formative feedback?", "Formative feedback dates?", "Mid-semester feedback?"],
+     "[CALENDAR]: Formative Feedback is from 16th to 18th March 2026."),
+    (["When is summative feedback?", "Summative feedback dates?", "End-semester feedback?"],
+     "[CALENDAR]: Summative Feedback is from 4th to 6th May 2026."),
+]
+
+# ---------------- Term Dates ----------------
+TERM_DATES = [
+    (["When does the semester start?", "Term commencement date?", "When do classes begin?"],
+     "[CALENDAR]: The Even Semester 2025-26 term commences on 16th February 2026 and ends on 9th June 2026 for all programs."),
+    (["When does the semester end?", "End of term date?", "Last day of the semester?"],
+     "[CALENDAR]: The Even Semester 2025-26 term ends on 9th June 2026, followed by Practical Exams (12th-16th June) and Theory Exams (from 19th June 2026)."),
+    (["How many working days this semester?", "Total working days?"],
+     "[CALENDAR]: The Even Semester 2025-26 has a total of 90 working days from 16th February to 9th June 2026."),
+]
+
 # --- Final Assembly ---
 final_pairs = []
 
@@ -303,8 +365,10 @@ final_pairs.append({"user": "List all holidays this semester.", "assistant": "[C
 final_pairs.append({"user": "How many holidays are there this semester?", "assistant": "[CALENDAR]: There are 9 holidays this semester: Ugadi, Compensatory, Ramzan, Mahavir Jayanti, Good Friday, Ambedkar Jayanti, Basava Jayanti, May Day, and Bakrid."})
 final_pairs.append({"user": "All college holidays 2026?", "assistant": "[CALENDAR]: All holidays: Ugadi (19 Mar), Compensatory (20 Mar), Ramzan (21 Mar), Mahavir Jayanti (31 Mar), Good Friday (3 Apr), Ambedkar Jayanti (14 Apr), Basava Jayanti (20 Apr), May Day (1 May), Bakrid (28 May)."})
 
-# 7. Add all timetable + ESA to final_pairs
-for questions, answer in IV_TIMETABLE + VI_TIMETABLE + ELECTIVES + ESA_DATES:
+# 7. Add all timetable + ESA + calendar events to final_pairs
+all_qa_lists = (IV_TIMETABLE + VI_TIMETABLE + ELECTIVES + ESA_DATES + 
+                REGISTRATION + MINOR_EXAMS + ACADEMIC_EVENTS + FEEDBACK + TERM_DATES + PLACEMENTS)
+for questions, answer in all_qa_lists:
     for q in questions:
         final_pairs.append({"user": q, "assistant": answer})
 

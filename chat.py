@@ -148,6 +148,13 @@ class KLETechChatbot:
             "companies": "[PLACEMENT]", "company": "[PLACEMENT]",
             "rank": "[RANKING]", "nirf": "[RANKING]", "ranking": "[RANKING]",
             "location": "[LOCATION]", "address": "[LOCATION]", "campus": "[LOCATION]",
+            "minor exam": "[CALENDAR]", "minor 1": "[CALENDAR]", "minor 2": "[CALENDAR]",
+            "registration": "[CALENDAR]", "counselling": "[CALENDAR]",
+            "formative feedback": "[CALENDAR]", "summative feedback": "[CALENDAR]",
+            "pleiades": "[CALENDAR]", "fest": "[CALENDAR]",
+            "working days": "[CALENDAR]", "term commencement": "[CALENDAR]",
+            "course drop": "[CALENDAR]", "course withdrawal": "[CALENDAR]",
+            "attendance report": "[CALENDAR]", "class committee": "[CALENDAR]",
         }
         matched_tag = None
         for keyword, tag in tag_keywords.items():
@@ -290,7 +297,7 @@ class KLETechChatbot:
             return self._format_direct(facts)
 
         # DIRECT BYPASS for ALL factual queries — Qwen is too small to handle them accurately
-        # This covers: fees, placements, location, ranking
+        # This covers: fees, placements, location, ranking, calendar events
         tag_keywords = {
             "fee": "[FEE]", "fees": "[FEE]", "kcet": "[FEE]", "comedk": "[FEE]", 
             "cost": "[FEE]", "tuition": "[FEE]",
@@ -300,6 +307,13 @@ class KLETechChatbot:
             "rank": "[RANKING]", "nirf": "[RANKING]", "ranking": "[RANKING]",
             "location": "[LOCATION]", "address": "[LOCATION]", "campus": "[LOCATION]",
             "reach": "[LOCATION]", "airport": "[LOCATION]",
+            "minor exam": "[CALENDAR]", "minor 1": "[CALENDAR]", "minor 2": "[CALENDAR]",
+            "registration": "[CALENDAR]", "counselling": "[CALENDAR]",
+            "formative feedback": "[CALENDAR]", "summative feedback": "[CALENDAR]",
+            "pleiades": "[CALENDAR]", "fest": "[CALENDAR]",
+            "working days": "[CALENDAR]", "term commencement": "[CALENDAR]",
+            "course drop": "[CALENDAR]", "course withdrawal": "[CALENDAR]",
+            "attendance report": "[CALENDAR]", "class committee": "[CALENDAR]",
         }
         
         matched_tag = None
@@ -356,8 +370,64 @@ class KLETechChatbot:
                             specific = [f for f in tagged_facts if "highest package ever" in f.lower()]
                             if specific: tagged_facts = specific
                         else:
-                            # Generic placement query — show just the overview (first 2 facts)
                             tagged_facts = tagged_facts[:2]
+                
+                elif matched_tag == "[CALENDAR]":
+                    # Keyword-based narrowing for calendar queries
+                    if "minor 2" in q_lower or "minor-2" in q_lower or "second minor" in q_lower:
+                        specific = [f for f in tagged_facts if "Minor-2" in f]
+                        if specific: tagged_facts = specific
+                    elif "minor 1" in q_lower or "minor-1" in q_lower or "first minor" in q_lower:
+                        specific = [f for f in tagged_facts if "Minor-1" in f]
+                        if specific: tagged_facts = specific
+                    elif "minor" in q_lower and "make" in q_lower:
+                        specific = [f for f in tagged_facts if "Make-Up" in f]
+                        if specific: tagged_facts = specific
+                    elif "minor" in q_lower:
+                        specific = [f for f in tagged_facts if "Minor-" in f]
+                        if specific: tagged_facts = specific
+                    elif "registration" in q_lower or "register" in q_lower:
+                        specific = [f for f in tagged_facts if "Registration" in f or "registration" in f]
+                        if specific: tagged_facts = specific
+                    elif "counselling" in q_lower or "counseling" in q_lower:
+                        specific = [f for f in tagged_facts if "Counselling" in f]
+                        if specific: tagged_facts = specific
+                    elif "pleiades" in q_lower or "fest" in q_lower:
+                        specific = [f for f in tagged_facts if "Pleiades" in f]
+                        if specific: tagged_facts = specific
+                    elif "formative" in q_lower:
+                        specific = [f for f in tagged_facts if "Formative" in f]
+                        if specific: tagged_facts = specific
+                    elif "summative" in q_lower:
+                        specific = [f for f in tagged_facts if "Summative" in f]
+                        if specific: tagged_facts = specific
+                    elif "feedback" in q_lower:
+                        specific = [f for f in tagged_facts if "Feedback" in f]
+                        if specific: tagged_facts = specific
+                    elif "attendance report" in q_lower or "attendance" in q_lower:
+                        specific = [f for f in tagged_facts if "attendance report" in f.lower()]
+                        if specific: tagged_facts = specific
+                    elif "class committee" in q_lower or "ccm" in q_lower:
+                        specific = [f for f in tagged_facts if "Class Committee" in f]
+                        if specific: tagged_facts = specific
+                    elif "drop" in q_lower:
+                        specific = [f for f in tagged_facts if "dropping" in f]
+                        if specific: tagged_facts = specific
+                    elif "withdrawal" in q_lower or "withdraw" in q_lower:
+                        specific = [f for f in tagged_facts if "withdrawal" in f]
+                        if specific: tagged_facts = specific
+                    elif "working day" in q_lower or "how many days" in q_lower:
+                        specific = [f for f in tagged_facts if "working days" in f.lower() or "90" in f]
+                        if specific: tagged_facts = specific
+                    elif "semester start" in q_lower or "term start" in q_lower or "when does semester" in q_lower:
+                        specific = [f for f in tagged_facts if "commences" in f]
+                        if specific: tagged_facts = specific
+                    elif "semester end" in q_lower or "term end" in q_lower:
+                        specific = [f for f in tagged_facts if "term ends" in f.lower()]
+                        if specific: tagged_facts = specific
+                    else:
+                        # Generic calendar — show first 3 most relevant
+                        tagged_facts = tagged_facts[:3]
                 
                 # Clean tags and return directly
                 lines = []
