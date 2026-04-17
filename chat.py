@@ -125,10 +125,17 @@ class KLETechChatbot:
                 break
 
         # HYBRID FILTER: Detect division letter (A-F)
-        required_div = None
-        div_match = re.search(r'\b(?:div(?:ision)?\s*([a-f])|([a-f])\s*div(?:ision)?)\b', q_lower)
         if div_match:
             required_div = (div_match.group(1) or div_match.group(2)).upper()
+
+        # HYBRID FILTER: Detect month (for holidays)
+        months = ["january", "february", "march", "april", "may", "june", 
+                  "july", "august", "september", "october", "november", "december"]
+        required_month = None
+        for month in months:
+            if month in q_lower:
+                required_month = month.capitalize()
+                break
 
         # Get top indices
         best_indices = np.argsort(similarities)[-30:][::-1]  # Look at top 30 for filtering
@@ -148,12 +155,21 @@ class KLETechChatbot:
                     continue
             
             # DIVISION FILTER: Skip timetable facts from OTHER divisions
-            if required_div and "[ACADEMIC]" in fact_text:
-                # Fact format: [ACADEMIC]: Monday (Semester 6 D): ...
-                # Match the division letter inside the parentheses
                 div_in_fact = re.search(r'\((?:Semester \d+ )?([A-F])\)', fact_text)
                 if div_in_fact and div_in_fact.group(1) != required_div:
                     continue
+            
+            # MONTH FILTER: If a month is asked, skip holiday facts that don't match that month
+            if required_month and ("[CALENDAR]" in fact_text or "[HOLIDAY]" in fact_text or "holiday" in fact_text.lower()):
+                # If they ask "April holidays", don't show "March holidays"
+                if required_month not in fact_text:
+                    continue
+            
+            # TOTAL HOLIDAYS FILTER: If they ask for ALL holidays, prioritize the summary fact
+            if "list all" in q_lower and "holiday" in q_lower and not required_month:
+                if "9 holidays" not in fact_text and "All holidays:" not in fact_text:
+                    # If this is a specific one-holiday fact, but we want the list, skip it for now
+                    if "[HOLIDAY]" in fact_text: continue
             
             filtered_facts.append(fact_text)
             if len(filtered_facts) >= TOP_K:
@@ -164,19 +180,17 @@ class KLETechChatbot:
         
         return filtered_facts
 
-    def _format_timetable(self, facts, query):
-        """Format timetable facts exclusively to avoid messiness."""
+    def _format_direct(self, facts):
+        """Format timetable and calendar facts directly to ensure accuracy and brevity."""
+        lines = []
         academic_facts = [f for f in facts if "[ACADEMIC]" in f]
-        
-        # If we have specific schedule facts, only show those to keep it clean
+        calendar_facts = [f for f in facts if "[CALENDAR]" in f or "[HOLIDAY]" in f]
+
         if academic_facts:
-            lines = []
             for f in academic_facts:
-                # Extract schedule part: Monday (Semester 6 D): ...
                 match = re.search(r'\[ACADEMIC\]:\s*.+?\):(.+)', f)
                 if match:
                     schedule = match.group(1).strip().rstrip('.')
-                    # Split by comma ONLY if not inside parentheses
                     subjects = []
                     current = []
                     depth = 0
@@ -191,35 +205,38 @@ class KLETechChatbot:
                     if current:
                         subjects.append("".join(current).strip())
                     lines.extend([s for s in subjects if s])
-                elif "on Monday/Tuesday/Thursday" in f or "Div" in f:
-                    # Keep general room info only if no specific schedule was found
-                    if not lines:
-                         lines.append(re.sub(r'\[KLE Tech University Knowledge\]\s*\[ACADEMIC\]:\s*', '', f).strip())
-            return "\n".join(list(dict.fromkeys(lines))) # Unique lines only
-
-        # Fallback to general cleaning if no academic facts found
-        lines = []
-        for f in facts:
-            clean = re.sub(r'\[KLE Tech University Knowledge\]\s*(\[[A-Z]+\]:)?\s*', '', f).strip()
-            lines.append(clean)
-        return "\n".join(list(dict.fromkeys(lines)))
+                else:
+                    clean = re.sub(r'\[KLE Tech University Knowledge\]\s*\[ACADEMIC\]:\s*', '', f).strip()
+                    lines.append(clean)
+        
+        elif calendar_facts:
+            for f in calendar_facts:
+                clean = re.sub(r'\[KLE Tech University Knowledge\]\s*(\[[A-Z]+\]:)?\s*', '', f).strip()
+                lines.append(clean)
+        
+        # Unique lines only, preserving order
+        seen = set()
+        return "\n".join([x for x in lines if not (x in seen or seen.add(x))])
 
     def generate(self, query, facts):
-        # For timetable queries, bypass LLM entirely — format directly for accuracy
+        # Direct bypass for Timetables, Holidays, and Calendars
         q_lower = query.lower()
-        timetable_keywords = ["timetable", "schedule", "class", "monday", "tuesday",
-                              "wednesday", "thursday", "friday", "saturday"]
-        if any(k in q_lower for k in timetable_keywords):
-            return self._format_timetable(facts, query)
+        direct_keywords = ["timetable", "schedule", "class", "monday", "tuesday", "wednesday", 
+                           "thursday", "friday", "saturday", "holiday", "calendar", "vacation"]
+        
+        if any(k in q_lower for k in direct_keywords):
+            return self._format_direct(facts)
 
-        # For general queries (placement, holidays, greetings) use Qwen
+        # For general queries, use Qwen with strict constraints
         context = "\n".join([f"- {f}" for f in facts])
         prompt = f"""You are a helpful assistant for KLE Tech University.
-Answer using ONLY the facts provided below. 
+Answer using ONLY the facts provided below.
+
 STRICT RULES:
-1. Be extremely concise. Max 1-2 sentences.
-2. Direct answers only. No filler like "Based on the info..." or "Here is the answer...".
-3. Use a friendly but professional tone.
+1. Output ONLY the answer. No intro, no outro, no explanations.
+2. If listing items, use bullet points.
+3. Max 2 sentences total.
+4. Strictly forbidden: "Explanation of the answer", "Based on information", "According to facts".
 
 Facts:
 {context}
@@ -231,7 +248,7 @@ Answer:"""
         with torch.no_grad():
             outputs = self.llm.generate(
                 **inputs,
-                max_new_tokens=120,
+                max_new_tokens=256,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id
             )
