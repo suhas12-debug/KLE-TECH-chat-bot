@@ -1,0 +1,6 @@
+sentence-transformers
+transformers
+bitsandbytes
+accelerate
+torch
+numpy
