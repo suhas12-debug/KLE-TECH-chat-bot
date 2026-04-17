@@ -26,6 +26,41 @@ UNIVERSITY_FACTS = [
     )
 ]
 
+PLACEMENTS = [
+    (
+        ["What is the highest placement package of all time at KLE Tech?", "Highest package ever recorded?", "Who gave the highest placement and for how much?"],
+        "[PLACEMENT]: The highest package ever recorded at KLE Technological University is an impressive INR 46.38 LPA, which was offered to a student of the 2024 batch by Amazon."
+    ),
+    (
+        ["What is the average package at KLE Tech?", "What is the median salary for graduates?"],
+        "[PLACEMENT]: The average placement package at KLE Tech is approximately INR 5.3 LPA, with the median package for undergraduate programs sitting around INR 7.00 LPA in recent years."
+    ),
+    (
+        ["Tell me about the placements in 2024.", "What were the placement highlights for the 2024 batch?", "How were the 2024 placements?"],
+        "[PLACEMENT]: For the 2024 batch, the highest package was INR 46.38 LPA by Amazon. Other significant offers included Texas Instruments (9 students selected at INR 28 LPA), AWS (INR 26 LPA), Applied Materials (11 students selected at INR 13.75 LPA), and Mercedes-Benz (INR 10 LPA). Key recruiters included TCS, Deloitte, and Tata Elxsi."
+    ),
+    (
+        ["What were the placement statistics for 2023?", "How was the hiring in 2023?", "Tell me about MBA placements."],
+        "[PLACEMENT]: In 2023, the highest package was approximately INR 33.00 LPA. A historic milestone was Bosch Global Software Technologies (BGSW) hiring 249 students in a single go. Notably, the MBA 2023-2024 batch achieved 100% placement."
+    ),
+    (
+        ["Can you give details about the 2022 placements?", "Who were the top recruiters in 2022 and what was the highest package?"],
+        "[PLACEMENT]: In 2022, the highest package reached INR 43.00 LPA, offered by Twilio. Other major recruiters included Cognizant (272 students), Accenture (115), and Capgemini (91). Amazon AWS also hired 40 students."
+    ),
+    (
+        ["Who are the top recruiters at KLE Tech?", "Which companies visit KLE Tech for placements?", "List some leading recruiters."],
+        "[PLACEMENT]: Major recruiters include Amazon, Google India, AWS, Twilio, Texas Instruments, Applied Materials, Mercedes-Benz, Bosch, Deloitte, TCS, Siemens, and Tata Elxsi. Many of these companies offer high-value roles and long-term internships."
+    ),
+    (
+        ["Who is the Placement Officer at KLE Tech?", "Who manages placements at KLE Tech Hubballi?", "Contact info for placement cell?"],
+        "[PLACEMENT]: The Training and Placement Cell in Hubballi is headed by Prof. C. D. Kerure (Placement Officer). Other key members include Prof. Bhargavi Pandurangi (Management Coordinator), Dr. Alok Gaddi (Industry Interaction), and Dr. Suvarna Nimbagal (BBA Head)."
+    ),
+    (
+        ["What does the Placement Cell do?", "How does the placement office help students?", "Does the college provide resume building help?"],
+        "[PLACEMENT]: The Placement Cell facilitates internships, Pre-Placement Offers (PPOs), and skill-development. It organizes technical workshops, resume-building sessions, and mock interviews. It also acts as a bridge between industry and academia, ensuring students are industry-ready."
+    )
+]
+
 FEES = [
     (
         ["What is the KCET fee?", "Government quota fee for B.E.?", "CET quota charges."],

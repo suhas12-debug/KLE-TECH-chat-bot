@@ -125,6 +125,8 @@ class KLETechChatbot:
                 break
 
         # HYBRID FILTER: Detect division letter (A-F)
+        required_div = None
+        div_match = re.search(r'\b(?:div(?:ision)?\s*([a-f])|([a-f])\s*div(?:ision)?)\b', q_lower)
         if div_match:
             required_div = (div_match.group(1) or div_match.group(2)).upper()
 
@@ -136,13 +138,73 @@ class KLETechChatbot:
             if month in q_lower:
                 required_month = month.capitalize()
                 break
+        
+        # HYBRID FILTER: Detect tags for factual queries
+        tag_keywords = {
+            "fee": "[FEE]", "fees": "[FEE]", "kcet": "[FEE]", "comedk": "[FEE]",
+            "cost": "[FEE]", "tuition": "[FEE]",
+            "placement": "[PLACEMENT]", "placed": "[PLACEMENT]", "package": "[PLACEMENT]",
+            "recruiter": "[PLACEMENT]", "recruiters": "[PLACEMENT]", "hiring": "[PLACEMENT]",
+            "companies": "[PLACEMENT]", "company": "[PLACEMENT]",
+            "rank": "[RANKING]", "nirf": "[RANKING]", "ranking": "[RANKING]",
+            "location": "[LOCATION]", "address": "[LOCATION]", "campus": "[LOCATION]",
+        }
+        matched_tag = None
+        for keyword, tag in tag_keywords.items():
+            if keyword in q_lower:
+                matched_tag = tag
+                break
 
         # Get top indices
         best_indices = np.argsort(similarities)[-30:][::-1]  # Look at top 30 for filtering
         
         filtered_facts = []
+
+        # YEAR-PRIORITY SCAN: For placement year queries, do a full-database keyword scan
+        requested_year = None
+        if matched_tag == "[PLACEMENT]":
+            year_match = re.search(r'\b(20\d{2})\b', q_lower)
+            if year_match:
+                requested_year = year_match.group(1)
+                known_years = ["2024", "2023", "2022"]
+                
+                if requested_year not in known_years:
+                    # Year not in our database — return honest "no data" response
+                    return ["NO_DATA_FOR_YEAR"]
+                
+                # Scan entire DB for this year + tag
+                for f in self.facts:
+                    if matched_tag in f and requested_year in f:
+                        # Use regex to avoid "2023-2024" matching a search for just "2024"
+                        # "In 2023" fact contains "2023-2024" which falsely matches "2024"
+                        if requested_year == "2024":
+                            if f.find("In 2023") != -1: continue
+                        if requested_year == "2023":
+                            # Only include facts that talk ABOUT 2023, not just mention it in passing
+                            if "In 2023" not in f and "2023 batch" not in f.lower(): continue
+                        if f not in filtered_facts:
+                            filtered_facts.append(f)
+                
+                # If year-scan found facts, return them directly (skip vector search)
+                if filtered_facts:
+                    return filtered_facts
+        
+        # TAG-PRIORITY SCAN: If a factual tag is detected, scan the full DB for matching facts
+        # Return ALL matching tagged facts — generate() will sub-filter to the specific one needed
+        if matched_tag and not filtered_facts:
+            tag_facts = [f for f in self.facts if matched_tag in f]
+            if tag_facts:
+                return tag_facts  # Return ALL, not TOP_K — sub-filter in generate() will narrow
+        
+        # Normal vector-search loop for non-year queries
         for i in best_indices:
+            if len(filtered_facts) >= TOP_K: break
+            
             fact_text = self.facts[i]
+            
+            # Skip duplicates from year-scan above
+            if fact_text in filtered_facts:
+                continue
             
             # SEMESTER FILTER: Skip facts from OTHER semesters
             if required_sem and required_sem in self.available_sems:
@@ -155,20 +217,19 @@ class KLETechChatbot:
                     continue
             
             # DIVISION FILTER: Skip timetable facts from OTHER divisions
+            if required_div and "[ACADEMIC]" in fact_text:
                 div_in_fact = re.search(r'\((?:Semester \d+ )?([A-F])\)', fact_text)
                 if div_in_fact and div_in_fact.group(1) != required_div:
                     continue
             
             # MONTH FILTER: If a month is asked, skip holiday facts that don't match that month
             if required_month and ("[CALENDAR]" in fact_text or "[HOLIDAY]" in fact_text or "holiday" in fact_text.lower()):
-                # If they ask "April holidays", don't show "March holidays"
                 if required_month not in fact_text:
                     continue
             
             # TOTAL HOLIDAYS FILTER: If they ask for ALL holidays, prioritize the summary fact
             if "list all" in q_lower and "holiday" in q_lower and not required_month:
                 if "9 holidays" not in fact_text and "All holidays:" not in fact_text:
-                    # If this is a specific one-holiday fact, but we want the list, skip it for now
                     if "[HOLIDAY]" in fact_text: continue
             
             filtered_facts.append(fact_text)
@@ -179,6 +240,7 @@ class KLETechChatbot:
             return None
         
         return filtered_facts
+
 
     def _format_direct(self, facts):
         """Format timetable and calendar facts directly to ensure accuracy and brevity."""
@@ -227,16 +289,88 @@ class KLETechChatbot:
         if any(k in q_lower for k in direct_keywords):
             return self._format_direct(facts)
 
+        # DIRECT BYPASS for ALL factual queries — Qwen is too small to handle them accurately
+        # This covers: fees, placements, location, ranking
+        tag_keywords = {
+            "fee": "[FEE]", "fees": "[FEE]", "kcet": "[FEE]", "comedk": "[FEE]", 
+            "cost": "[FEE]", "tuition": "[FEE]",
+            "placement": "[PLACEMENT]", "placed": "[PLACEMENT]", "package": "[PLACEMENT]",
+            "recruiter": "[PLACEMENT]", "recruiters": "[PLACEMENT]", "hiring": "[PLACEMENT]",
+            "placement officer": "[PLACEMENT]", "placement cell": "[PLACEMENT]",
+            "rank": "[RANKING]", "nirf": "[RANKING]", "ranking": "[RANKING]",
+            "location": "[LOCATION]", "address": "[LOCATION]", "campus": "[LOCATION]",
+            "reach": "[LOCATION]", "airport": "[LOCATION]",
+        }
+        
+        matched_tag = None
+        for keyword, tag in tag_keywords.items():
+            if keyword in q_lower:
+                matched_tag = tag
+                break
+        
+        if matched_tag:
+            tagged_facts = [f for f in facts if matched_tag in f]
+            if tagged_facts:
+                # SUB-FILTERING: Narrow results based on specific keywords
+                if matched_tag == "[FEE]":
+                    if "kcet" in q_lower or "government" in q_lower or "cet" in q_lower:
+                        specific = [f for f in tagged_facts if "KCET" in f or "Government" in f]
+                        if specific: tagged_facts = specific
+                    elif "comedk" in q_lower or "management" in q_lower:
+                        specific = [f for f in tagged_facts if "COMEDK" in f]
+                        if specific: tagged_facts = specific
+                
+                elif matched_tag == "[PLACEMENT]":
+                    # Year-based filtering for placement queries
+                    found_year = False
+                    for year in ["2024", "2023", "2022"]:
+                        if year in q_lower:
+                            # Strict match: Fact must contain the year AND preferably start with it
+                            specific = [f for f in tagged_facts if year in f]
+                            # Avoid "2023 fact stealing 2024"
+                            if year == "2024":
+                                specific = [f for f in specific if not f.startswith("In 2023")]
+                            if year == "2023":
+                                specific = [f for f in specific if f.startswith("In 2023")]
+                            
+                            if specific: 
+                                tagged_facts = specific
+                                found_year = True
+                            break
+                    
+                    if not found_year:
+                        # Keyword-based narrowing only if no year was requested
+                        if "officer" in q_lower or "contact" in q_lower or "head" in q_lower:
+                            specific = [f for f in tagged_facts if "Placement Cell" in f or "Placement Officer" in f or "headed" in f]
+                            if specific: tagged_facts = specific
+                        elif "recruiter" in q_lower or "companies" in q_lower or "company" in q_lower:
+                            specific = [f for f in tagged_facts if "Major recruiters" in f]
+                            if specific: tagged_facts = specific
+                        elif "cell" in q_lower or "help" in q_lower or "resume" in q_lower or "workshop" in q_lower:
+                            specific = [f for f in tagged_facts if "Placement Cell facilitates" in f]
+                            if specific: tagged_facts = specific
+                        elif "average" in q_lower or "median" in q_lower:
+                            specific = [f for f in tagged_facts if "average" in f.lower() or "median" in f.lower()]
+                            if specific: tagged_facts = specific
+                        elif "highest" in q_lower:
+                            specific = [f for f in tagged_facts if "highest package ever" in f.lower()]
+                            if specific: tagged_facts = specific
+                        else:
+                            # Generic placement query — show just the overview (first 2 facts)
+                            tagged_facts = tagged_facts[:2]
+                
+                # Clean tags and return directly
+                lines = []
+                for f in tagged_facts:
+                    clean = re.sub(r'\[KLE Tech University Knowledge\]\s*(\[[A-Z]+\]:)?\s*', '', f).strip()
+                    lines.append(clean)
+                return "\n".join(lines)
+
+
         # For general queries, use Qwen with strict constraints
         context = "\n".join([f"- {f}" for f in facts])
         prompt = f"""You are a helpful assistant for KLE Tech University.
-Answer using ONLY the facts provided below.
-
-STRICT RULES:
-1. Output ONLY the answer. No intro, no outro, no explanations.
-2. If listing items, use bullet points.
-3. Max 2 sentences total.
-4. Strictly forbidden: "Explanation of the answer", "Based on information", "According to facts".
+Answer using ONLY the facts below. Output ONLY the direct answer in 1-2 sentences. Do not explain.
 
 Facts:
 {context}
@@ -257,8 +391,22 @@ Answer:"""
         # Extract the answer — split on last occurrence of "Answer:"
         split_marker = "Answer:"
         if split_marker in full_text:
-            return full_text.split(split_marker)[-1].strip()
-        return full_text.strip()
+            answer = full_text.split(split_marker)[-1].strip()
+        else:
+            answer = full_text.strip()
+        
+        # TRUNCATION: Cut off AI rambling (Explanation:, Note:, etc.)
+        for stop_phrase in ["Explanation:", "Explanation of", "Note:", "I have listed", 
+                            "This approach", "The final answer", "Based on this"]:
+            if stop_phrase in answer:
+                answer = answer[:answer.index(stop_phrase)].strip()
+        
+        # Also limit to first 3 sentences max
+        sentences = re.split(r'(?<=[.!?])\s+', answer)
+        if len(sentences) > 3:
+            answer = ' '.join(sentences[:3])
+        
+        return answer.strip() if answer.strip() else "I don't have enough information to answer that."
 
     def chat(self):
         while True:
@@ -273,6 +421,11 @@ Answer:"""
                 
                 if facts is None:
                     print(f"{CLR_GREEN}Bot:{CLR_RESET} Please contact the university office\n")
+                elif facts == ["NO_DATA_FOR_YEAR"]:
+                    # Extract the year they asked about
+                    year_match = re.search(r'\b(20\d{2})\b', user_input)
+                    year_str = year_match.group(1) if year_match else "that year"
+                    print(f"{CLR_GREEN}Bot:{CLR_RESET} Sorry, placement data for {year_str} is not available in our database. We currently have data for 2022, 2023, and 2024.\n")
                 else:
                     response = self.generate(user_input, facts)
                     print(f"{CLR_GREEN}Bot:{CLR_RESET} {response}\n")
