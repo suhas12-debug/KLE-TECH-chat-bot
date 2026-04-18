@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 # --- Configuration ---
-MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
+MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 EMBED_MODEL_ID = "all-MiniLM-L6-v2"
 THRESHOLD = 0.35
 TOP_K = 5
@@ -41,7 +41,7 @@ class KLETechChatbot:
         )))
         print(f"{CLR_YELLOW}Detected semesters: {', '.join(self.available_sems)}{CLR_RESET}")
             
-        print(f"{CLR_YELLOW}Loading Qwen 2.5-0.5B-Instruct (4-bit GPU)...{CLR_RESET}")
+        print(f"{CLR_YELLOW}Loading Qwen 2.5-1.5B-Instruct (4-bit GPU)...{CLR_RESET}")
         try:
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
