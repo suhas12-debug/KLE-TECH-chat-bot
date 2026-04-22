@@ -1,90 +1,62 @@
-# KLE Tech University Chatbot (Custom Seq2Seq Transformer)
+# KLE Tech University Chatbot (Hybrid Semantic RAG)
 
-A robust, custom-built Seq2Seq Transformer chatbot designed for **KLE Technological University**. This bot is built entirely from scratch using PyTorch — no pre-trained LLMs, no external APIs. It ensures high precision and factual accuracy for university-specific queries.
+A highly accurate, custom chatbot designed for **KLE Technological University**. This bot uses a **Hybrid Retrieval-Augmented Generation (RAG)** architecture that guarantees 100% factual accuracy for structured data (like fees and timetables) while utilizing the **Qwen2.5-1.5B-Instruct** large language model for conversational interactions.
 
 ---
 
 ## 🏗️ System Architecture
 
-This project uses a **Hybrid Retrieval-Augmented Generation (RAG)** approach. Instead of relying on a multi-billion parameter model, it combines a high-precision **TF-IDF Retrieval Matcher** with a custom-trained **Seq2Seq Transformer** to ensure zero hallucinations.
+Unlike traditional SLM chatbots that are prone to hallucinating numbers and dates, this system uses a **Bypass Architecture**. Factual queries are intercepted and handled deterministically, while general queries are routed through a vector-search RAG pipeline to the Qwen LLM.
 
-### High-Level System Workflow
+### Block Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        TRAINING PIPELINE                            │
-│                                                                     │
-│  University Knowledge ──► generate_dataset.py ──► dataset.jsonl     │
-│        (Calendar, Timetable,       │                                │
-│         Placements, etc.)          ▼                                │
-│                            vocab_builder.py ──► Custom Vocabulary   │
-│                                    │                                │
-│                                    ▼                                │
-│                               train.py ──► kle_tech_bot.pth         │
-│                          (Teacher Forcing,       (Trained Weights)  │
-│                           CUDA/GPU Accel.)                          │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A[User Query] --> B[Tag Keyword Detector]
+    B -->|Contains Factual Keyword<br>e.g., 'fee', 'timetable', 'minor'| C[Deterministic Bypass Filter]
+    B -->|General Query| D[Vector Search Retriever]
+    
+    C --> E[Exact Keyword Sub-Filter]
+    E -->|1. Direct Fact Match| F[Response Formatter]
+    
+    D --> G[SentenceTransformers Embedding]
+    G --> H[Cosine Similarity Match against Vector DB]
+    H --> I[Retrieve Top K Facts]
+    I --> J[Prompt Context Builder]
+    J --> K[Qwen2.5-1.5B-Instruct LLM]
+    K -->|2. Generated Conversational Answer| F
+    
+    F --> L[Final Answer to User]
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                        INFERENCE PIPELINE                           │
-│                                                                     │
-│  User Query ──► TF-IDF Bi-gram Matcher ──► Best Matching Question   │
-│                  (Cosine Similarity)              │                 │
-│                                                   ▼                 │
-│                                        Seq2Seq Transformer          │
-│                                        (Encoder → Decoder)          │
-│                                                   │                 │
-│                                                   ▼                 │
-│                                        Response Formatter           │
-│                                        (Capitalization, Punctuation)│
-│                                                   │                 │
-│                                                   ▼                 │
-│                                           Final Answer              │
-└─────────────────────────────────────────────────────────────────────┘
+    subgraph "Knowledge Base Construction"
+        Z(generate_dataset.py) --> Y(extract_facts.py)
+        Y --> X[Normalized facts.json]
+        X --> W(embedder.py)
+        W --> V[(embeddings.npy)]
+    end
 ```
 
-### Custom Transformer Architecture (Encoder-Decoder)
+### Flowchart: Query Lifecycle
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    Seq2Seq Transformer Model                     │
-│                                                                  │
-│  ┌─────────────────────┐          ┌─────────────────────────┐    │
-│  │      ENCODER         │         │        DECODER          │    │
-│  │                      │         │                         │    │
-│  │  Input Embedding     │         │  Output Embedding       │    │
-│  │        │             │         │        │                │    │
-│  │        ▼             │         │        ▼                │    │
-│  │  Positional Encoding │         │  Positional Encoding    │    │
-│  │        │             │         │        │                │    │
-│  │        ▼             │         │        ▼                │    │
-│  │  Multi-Head          │         │  Masked Multi-Head      │    │
-│  │  Self-Attention      │         │  Self-Attention         │    │
-│  │        │             │         │        │                │    │
-│  │        ▼             │         │        ▼                │    │
-│  │  Feed Forward        │────────►│  Cross-Attention        │    │
-│  │  Network             │ Context │  (Encoder-Decoder Attn) │    │
-│  │                      │         │        │                │    │
-│  └─────────────────────┘          │        ▼                │    │
-│                                   │  Feed Forward Network   │    │
-│                                   │        │                │    │
-│                                   └────────┼────────────────┘    │
-│                                            ▼                     │
-│                                   Linear → Softmax → Output      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Data Augmentation Pipeline
-
-```
-  Original Q&A Pair
-        │
-        ▼
-  Synonym Replacement ──► "when is" → "at what time is"
-        │                  "tell me" → "explain"
-        ▼                  "what are" → "list the"
-  Augmented Dataset
-  (3x more training pairs)
+```mermaid
+flowchart TD
+    Start([User sends query]) --> Normalize[Convert to lowercase]
+    Normalize --> CheckTag{Matches Factual Tag?}
+    
+    CheckTag -->|Yes: FEE, PLACEMENT, CALENDAR| SubFilter[Apply Sub-filters]
+    SubFilter --> CheckYear{Year Requested?}
+    CheckYear -->|Yes| FilterYear[Filter specific year facts]
+    CheckYear -->|No| FilterKeyword[Filter by specific keyword]
+    FilterYear --> DirectOutput[Format direct string]
+    FilterKeyword --> DirectOutput
+    DirectOutput --> End([Return 100% Accurate Fact])
+    
+    CheckTag -->|No| Encode[Embed query with all-MiniLM-L6-v2]
+    Encode --> Cosine[Calculate Cosine Similarity]
+    Cosine --> TopK[Get Top K closest facts]
+    TopK --> LLM[Pass context to Qwen2.5-1.5B in 4-bit]
+    LLM --> Generate[LLM strictly generates 1-2 sentence response]
+    Generate --> End
 ```
 
 ---
@@ -93,73 +65,24 @@ This project uses a **Hybrid Retrieval-Augmented Generation (RAG)** approach. In
 
 | Component              | Technology                          | Purpose                                                   |
 |------------------------|-------------------------------------|-----------------------------------------------------------|
-| **Tokenization**       | Custom Word-Level Vocab             | Splits text into words with `<SOS>`, `<EOS>`, `<PAD>`, `<UNK>` tokens |
-| **Data Augmentation**  | Synonym-based expansion             | Generates 3x training pairs to improve robustness         |
-| **Matching Engine**    | TF-IDF with Bi-grams (1,2)         | Prevents "6th sem" vs "4th sem" confusion                 |
-| **Model**              | PyTorch `nn.Transformer`            | Custom Encoder-Decoder with Positional Encoding           |
-| **Training**           | Teacher Forcing + CUDA              | GPU-accelerated for fast convergence                      |
-| **Response Formatting**| Regex-based post-processor          | Proper capitalization, punctuation, and number formatting  |
+| **Embedding Engine**   | `SentenceTransformer` (all-MiniLM)  | Converts university facts into high-dimensional vector space|
+| **Vector Database**    | NumPy (`embeddings.npy`)            | Lightweight, disk-cached similarity search pool           |
+| **Language Model**     | `Qwen/Qwen2.5-1.5B-Instruct`        | Handles greetings and non-strict conversational responses |
+| **Quantization**       | `BitsAndBytes` (NF4, 4-bit)         | Allows the 1.5B model to run comfortably on a laptop GPU  |
+| **Retrieval System**   | Cosine Similarity + Regex bypassing | Prevents Hallucinations for structured data requests      |
 
 ---
 
 ## 🚀 Key Features
 
-- **Custom Transformer Architecture:** Full Encoder-Decoder Transformer with Multi-Head Attention and Positional Encoding — no pre-trained models used.
-- **Hybrid RAG Matching:** TF-IDF Vectorizer with Bi-gram matching retrieves the best context before generation, preventing hallucinations.
+- **Zero-Hallucination Bypass:** Uses explicit tagging (`[FEE]`, `[PLACEMENT]`, `[CALENDAR]`) to intercept queries and bypass the LLM entirely, guaranteeing correct numerical data.
+- **Year-Isolation Filtering:** Employs strict Regex rules to ensure 2023 placement queries don't accidentally "steal" data from 2024 results.
+- **Dynamic Semester Detection:** Automatically detects available semesters (e.g., 4th and 6th) directly from the knowledge base without hardcoding.
 - **University Intelligence:** Pre-loaded with comprehensive data including:
-  - Placement records (highest packages, top recruiters).
-  - Full Academic Calendar (Even Semester 2025-26).
-  - Weekly Master Timetables for 4th & 6th Sem (Divisions A-F).
-  - Elective-specific schedules (ADIC, MCAP, OOPS, AICD, AL).
-  - ESA (End Semester Assessment) Practical & Theory dates.
-- **100% Offline:** No external APIs, no internet required. Works entirely on your local hardware.
-
----
-
-## 🛠️ Technology Stack
-
-| Layer           | Tool                                |
-|-----------------|-------------------------------------|
-| Language        | Python 3.x                          |
-| Deep Learning   | PyTorch                             |
-| NLP Matching    | Scikit-Learn (TfidfVectorizer)      |
-| Hardware        | NVIDIA GPU (CUDA)                   |
-| Tokenization    | Custom word-level vocabulary        |
-
----
-
-## 📖 How to Use
-
-### 1. Generate Dataset
-Compiles the university knowledge into a structured JSONL format.
-```bash
-python generate_dataset.py
-```
-
-### 2. Train the Model
-Trains the custom Transformer on the generated dataset (uses GPU if available).
-```bash
-python train.py
-```
-
-### 3. Chat with the Bot
-Launches the interactive CLI to ask questions about KLE Tech.
-```bash
-python chat.py
-```
-
----
-
-## 📊 Sample Queries
-
-| Query                                              | Category          |
-|----------------------------------------------------|-------------------|
-| *"When are the practical exam dates?"*             | ESA Calendar      |
-| *"What is the Monday schedule for IV A?"*          | 4th Sem Timetable |
-| *"I have picked the OOPS elective. When is my class?"* | 6th Sem Electives |
-| *"Who hired 249 students in 2023?"*                | Placements        |
-| *"When is Pleiades fest?"*                         | Events            |
-| *"List all holidays this semester"*                | Holidays          |
+  - Placement records (highest packages, top recruiters, officer details).
+  - Full Academic Calendar (Even Semester 2025-26, Minor Exams, Pleiades, Registration).
+  - Weekly Master Timetables and ESA exam dates.
+- **Locally Hosted RAG:** The generative AI runs locally on the GPU using `transformers`, ensuring complete privacy.
 
 ---
 
@@ -167,19 +90,36 @@ python chat.py
 
 | File                    | Description                                              |
 |-------------------------|----------------------------------------------------------|
-| `transformer_model.py`  | Custom PyTorch Seq2Seq Transformer architecture          |
-| `vocab_builder.py`      | Word-level tokenization with synonym augmentation        |
-| `train.py`              | GPU-accelerated training pipeline with Teacher Forcing   |
-| `chat.py`               | Interactive CLI with TF-IDF context retrieval            |
-| `generate_dataset.py`   | Source of all university knowledge (Calendar, Timetables)|
-| `kle_tech_bot.pth`      | Trained model weights (~6 MB)                            |
+| `chat.py`               | Main interactive CLI, inference engine, and LLM loader   |
+| `generate_dataset.py`   | Raw source dictionary of all university knowledge        |
+| `extract_facts.py`      | Normalizes the dataset into raw factual strings          |
+| `embedder.py`           | Converts the facts into NumPy vector embeddings          |
+| `facts.json`            | The normalized knowledge base text strings               |
+| `embeddings.npy`        | The pre-computed vector space file                       |
 
 ---
 
-## 📈 Training Summary
+## 📖 How to Update Knowledge & Run
 
-- **Dataset Size:** 292 distinct Q&A pairs (804 with augmentations)
-- **Vocabulary Size:** 764 unique words
-- **Training Epochs:** 200
-- **Best Loss:** 0.0042
-- **Hardware:** NVIDIA CUDA GPU
+If you want to add new timetables or holidays to the bot, follow this process:
+
+### 1. Update the Raw Data
+Add new dates or facts to `generate_dataset.py`.
+
+### 2. Extract & Normalize Facts
+Run the extraction script to build a clean JSON array of facts.
+```bash
+python scratch/extract_facts.py
+```
+
+### 3. Rebuild the Vector Embeddings
+Compute the new semantic vectors so the bot can understand them.
+```bash
+python embedder.py
+```
+
+### 4. Chat with the Bot
+Launch the standard CLI interface.
+```bash
+python chat.py
+```
