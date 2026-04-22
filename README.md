@@ -8,55 +8,56 @@ A highly accurate, custom chatbot designed for **KLE Technological University**.
 
 Unlike traditional SLM chatbots that are prone to hallucinating numbers and dates, this system uses a **Bypass Architecture**. Factual queries are intercepted and handled deterministically, while general queries are routed through a vector-search RAG pipeline to the Qwen LLM.
 
-### Block Diagram
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     KNOWLEDGE BASE CONSTRUCTION                         │
+│                                                                         │
+│  [generate_dataset.py] ──► [extract_facts.py] ──► facts.json            │
+│  (Raw knowledge dicts)     (Normalizer text)      (Clean fact array)    │
+│                                                          │              │
+│                                                          ▼              │
+│                                 embeddings.npy ◄── [embedder.py]        │
+│                                 (Vector space)     (all-MiniLM-L6-v2)   │
+└─────────────────────────────────────────────────────────────────────────┘
 
-```mermaid
-graph TD
-    A[User Query] --> B[Tag Keyword Detector]
-    B -->|Contains Factual Keyword<br>e.g., 'fee', 'timetable', 'minor'| C[Deterministic Bypass Filter]
-    B -->|General Query| D[Vector Search Retriever]
-    
-    C --> E[Exact Keyword Sub-Filter]
-    E -->|1. Direct Fact Match| F[Response Formatter]
-    
-    D --> G[SentenceTransformers Embedding]
-    G --> H[Cosine Similarity Match against Vector DB]
-    H --> I[Retrieve Top K Facts]
-    I --> J[Prompt Context Builder]
-    J --> K[Qwen2.5-1.5B-Instruct LLM]
-    K -->|2. Generated Conversational Answer| F
-    
-    F --> L[Final Answer to User]
-
-    subgraph "Knowledge Base Construction"
-        Z(generate_dataset.py) --> Y(extract_facts.py)
-        Y --> X[Normalized facts.json]
-        X --> W(embedder.py)
-        W --> V[(embeddings.npy)]
-    end
-```
-
-### Flowchart: Query Lifecycle
-
-```mermaid
-flowchart TD
-    Start([User sends query]) --> Normalize[Convert to lowercase]
-    Normalize --> CheckTag{Matches Factual Tag?}
-    
-    CheckTag -->|Yes: FEE, PLACEMENT, CALENDAR| SubFilter[Apply Sub-filters]
-    SubFilter --> CheckYear{Year Requested?}
-    CheckYear -->|Yes| FilterYear[Filter specific year facts]
-    CheckYear -->|No| FilterKeyword[Filter by specific keyword]
-    FilterYear --> DirectOutput[Format direct string]
-    FilterKeyword --> DirectOutput
-    DirectOutput --> End([Return 100% Accurate Fact])
-    
-    CheckTag -->|No| Encode[Embed query with all-MiniLM-L6-v2]
-    Encode --> Cosine[Calculate Cosine Similarity]
-    Cosine --> TopK[Get Top K closest facts]
-    TopK --> LLM[Pass context to Qwen2.5-1.5B in 4-bit]
-    LLM --> Generate[LLM strictly generates 1-2 sentence response]
-    Generate --> End
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        HYBRID INFERENCE PIPELINE                        │
+│                                                                         │
+│                            [ User Query ]                               │
+│                                  │                                      │
+│                                  ▼                                      │
+│                      [ Tag Keyword Detector ]                           │
+│                                  │                                      │
+│              ┌───────────────────┴───────────────────┐                  │
+│     Contains Factual Tag                       No Factual Tag           │
+│   (e.g., 'fee', 'timetable')                   (General Query)          │
+│              │                                       │                  │
+│              ▼                                       ▼                  │
+│ [ Deterministic Bypass ]                [ Vector Search Retriever ]     │
+│              │                                       │                  │
+│              ▼                                       ▼                  │
+│ [ Sub-Filter (Year/Topic) ]                Encode with SentenceTrnsf    │
+│              │                                       │                  │
+│              ▼                                       ▼                  │
+│    [ Filter specific fact ]                   Cosine Similarity Search  │
+│              │                                       │                  │
+│              │                                       ▼                  │
+│              │                              [ Retrieve Top K Facts ]    │
+│              │                                       │                  │
+│              │                                       ▼                  │
+│              │                            Prompt Context Builder        │
+│              │                                       │                  │
+│              │                                       ▼                  │
+│              │                          [ Qwen2.5-1.5B-Instruct LLM ]   │
+│              │                                       │                  │
+│              │ 1. Direct Exact Match                 │ 2. AI Generated  │
+│              └───────────────────┬───────────────────┘                  │
+│                                  ▼                                      │
+│                       [ Response Formatter ]                            │
+│                                  │                                      │
+│                                  ▼                                      │
+│                           [ Final Answer ]                              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
