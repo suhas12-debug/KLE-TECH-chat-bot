@@ -218,6 +218,11 @@ class KLETechChatbot:
                 if any(s in fact_text for s in self.available_sems if s != required_sem) and required_sem not in fact_text:
                     continue
             
+            # TIMETABLE FILTER: If they ask for a timetable, skip non-academic facts
+            is_timetable_query = any(k in q_lower for k in ["timetable", "schedule", "class"])
+            if is_timetable_query and "[ACADEMIC]" not in fact_text:
+                continue
+                
             # DAY FILTER: Skip timetable facts from OTHER days
             if required_day and "[ACADEMIC]" in fact_text:
                 if not fact_text.startswith(f"[KLE Tech University Knowledge] [ACADEMIC]: {required_day}"):
