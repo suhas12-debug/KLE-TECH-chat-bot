@@ -1,32 +1,21 @@
 # KLE Tech University Chatbot (Hybrid Semantic RAG)
 
-A highly accurate, custom chatbot designed for **KLE Technological University**. This bot uses a **Hybrid Retrieval-Augmented Generation (RAG)** architecture that guarantees 100% factual accuracy for structured data (like fees and timetables) while utilizing the **Qwen2.5-1.5B-Instruct** large language model for conversational interactions.
+A high-precision, custom AI assistant designed for **KLE Technological University**. This bot uses a **Hybrid Retrieval-Augmented Generation (RAG)** architecture that guarantees 100% factual accuracy for structured academic data while utilizing **Qwen2.5-1.5B-Instruct** for conversational queries.
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ System Architecture: The "Bypass" Pipeline
 
-Unlike traditional SLM chatbots that are prone to hallucinating numbers and dates, this system uses a **Bypass Architecture**. Factual queries are intercepted and handled deterministically, while general queries are routed through a vector-search RAG pipeline to the Qwen LLM.
+Traditional LLMs often hallucinate dates, fees, and schedules. This system solves that using a **Deterministic Bypass Architecture**. 
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     KNOWLEDGE BASE CONSTRUCTION                         │
-│                                                                         │
-│  [generate_dataset.py] ──► [extract_facts.py] ──► facts.json            │
-│  (Raw knowledge dicts)     (Normalizer text)      (Clean fact array)    │
-│                                                          │              │
-│                                                          ▼              │
-│                                 embeddings.npy ◄── [embedder.py]        │
-│                                 (Vector space)     (all-MiniLM-L6-v2)   │
-└─────────────────────────────────────────────────────────────────────────┘
-
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        HYBRID INFERENCE PIPELINE                        │
 │                                                                         │
 │                            [ User Query ]                               │
 │                                  │                                      │
 │                                  ▼                                      │
-│                      [ Tag Keyword Detector ]                           │
+│                      [ Tag & Intent Detector ]                          │
 │                                  │                                      │
 │              ┌───────────────────┴───────────────────┐                  │
 │     Contains Factual Tag                       No Factual Tag           │
@@ -34,93 +23,85 @@ Unlike traditional SLM chatbots that are prone to hallucinating numbers and date
 │              │                                       │                  │
 │              ▼                                       ▼                  │
 │ [ Deterministic Bypass ]                [ Vector Search Retriever ]     │
+│  (Regex & Keyword Lock)                 (SBERT + Cosine Similarity)     │
 │              │                                       │                  │
 │              ▼                                       ▼                  │
-│ [ Sub-Filter (Year/Topic) ]                Encode with SentenceTrnsf    │
+│ [ Hard Filter: Day/Div/Sem ]               [ Retrieve Top 80 Facts ]    │
 │              │                                       │                  │
 │              ▼                                       ▼                  │
-│    [ Filter specific fact ]                   Cosine Similarity Search  │
-│              │                                       │                  │
-│              │                                       ▼                  │
-│              │                              [ Retrieve Top K Facts ]    │
-│              │                                       │                  │
-│              │                                       ▼                  │
-│              │                            Prompt Context Builder        │
+│    [ Format Direct Fact ]                  [ Prompt Context Builder ]   │
 │              │                                       │                  │
 │              │                                       ▼                  │
 │              │                          [ Qwen2.5-1.5B-Instruct LLM ]   │
 │              │                                       │                  │
-│              │ 1. Direct Exact Match                 │ 2. AI Generated  │
+│              │ 1. Direct Truth                       │ 2. AI Generated  │
 │              └───────────────────┬───────────────────┘                  │
 │                                  ▼                                      │
-│                       [ Response Formatter ]                            │
-│                                  │                                      │
-│                                  ▼                                      │
-│                           [ Final Answer ]                              │
+│                       [ Final Formatted Answer ]                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🛠️ Technical Implementation Details
+## 🛡️ Recent Hardening & Accuracy Features
 
-| Component              | Technology                          | Purpose                                                   |
-|------------------------|-------------------------------------|-----------------------------------------------------------|
-| **Embedding Engine**   | `SentenceTransformer` (all-MiniLM)  | Converts university facts into high-dimensional vector space|
-| **Vector Database**    | NumPy (`embeddings.npy`)            | Lightweight, disk-cached similarity search pool           |
-| **Language Model**     | `Qwen/Qwen2.5-1.5B-Instruct`        | Handles greetings and non-strict conversational responses |
-| **Quantization**       | `BitsAndBytes` (NF4, 4-bit)         | Allows the 1.5B model to run comfortably on a laptop GPU  |
-| **Retrieval System**   | Cosine Similarity + Regex bypassing | Prevents Hallucinations for structured data requests      |
+### 1. Robust Timetable Algorithm
+The bot now implements an **Implicit Intent Detection** algorithm. 
+- **Typo Tolerance:** Specifically handles common typos like `"timeteble"` and `"time table"`.
+- **Implicit Lock:** If a **Day** (e.g., Monday) and a **Division** (e.g., D) appear in the same sentence, the bot automatically locks the search to the Academic Timetable dataset, even if the word "timetable" isn't used.
+
+### 2. Deep Vector Search
+To prevent schedule facts from being "crowded out" by similar-looking calendar events (like working day swaps), the search depth has been increased from **Top 30 to Top 80 candidates**. This ensures the specific schedule for your division is always found and processed.
+
+### 3. Factual Integrity Tags
+- **[FEE]**: Direct bypass for tuition and admission costs.
+- **[PLACEMENT]**: Strict year-based filtering (2022-2024) to ensure no batch-data leakage.
+- **[ACADEMIC]**: Regex-locked weekly schedules.
+- **[CALENDAR]**: University holidays and event dates.
 
 ---
 
-## 🚀 Key Features
+## 🛠️ Technical Stack
 
-- **Zero-Hallucination Bypass:** Uses explicit tagging (`[FEE]`, `[PLACEMENT]`, `[CALENDAR]`) to intercept queries and bypass the LLM entirely, guaranteeing correct numerical data.
-- **Year-Isolation Filtering:** Employs strict Regex rules to ensure 2023 placement queries don't accidentally "steal" data from 2024 results.
-- **Dynamic Semester Detection:** Automatically detects available semesters (e.g., 4th and 6th) directly from the knowledge base without hardcoding.
-- **University Intelligence:** Pre-loaded with comprehensive data including:
-  - Placement records (highest packages, top recruiters, officer details).
-  - Full Academic Calendar (Even Semester 2025-26, Minor Exams, Pleiades, Registration).
-  - Weekly Master Timetables and ESA exam dates.
-- **Locally Hosted RAG:** The generative AI runs locally on the GPU using `transformers`, ensuring complete privacy.
+- **Embedding Engine**: `SentenceTransformer` (all-MiniLM-L6-v2) - Runs on **CPU** for stability.
+- **Language Model**: `Qwen2.5-1.5B-Instruct` - Runs on **GPU** (4-bit NF4 quantization).
+- **Inference Library**: `transformers`, `bitsandbytes`, `accelerate`.
+- **Logic**: Hybrid Python engine with strict Regex post-processing.
+
+---
+
+## 💻 System Requirements
+
+Because the bot runs a 1.5B parameter model locally, it has specific resource needs:
+- **VRAM**: Minimum 2GB (Runs comfortably on RTX 3050 Laptop).
+- **System RAM**: Minimum 8GB (Needs at least **2GB of free Physical RAM** to start the loading sequence).
+- **Storage**: ~5GB for model weights and embeddings.
+
+> [!IMPORTANT]
+> If the bot fails to start silently, ensure you have closed heavy background apps like Chrome or Edge to free up System RAM.
 
 ---
 
 ## 📁 Project Structure
 
-| File                    | Description                                              |
-|-------------------------|----------------------------------------------------------|
-| `chat.py`               | Main interactive CLI, inference engine, and LLM loader   |
-| `generate_dataset.py`   | Raw source dictionary of all university knowledge        |
-| `extract_facts.py`      | Normalizes the dataset into raw factual strings          |
-| `embedder.py`           | Converts the facts into NumPy vector embeddings          |
-| `facts.json`            | The normalized knowledge base text strings               |
-| `embeddings.npy`        | The pre-computed vector space file                       |
+| File | Purpose |
+|------|---------|
+| `chat.py` | The main engine. Handles retrieval, filtering, and the chat loop. |
+| `generate_dataset.py` | The raw knowledge source (Timetables, Fees, etc.). |
+| `extract_facts.py` | Normalizes raw data into a searchable JSON format. |
+| `embedder.py` | Rebuilds the mathematical vector space for the bot. |
 
 ---
 
-## 📖 How to Update Knowledge & Run
+## 📖 How to Update & Run
 
-If you want to add new timetables or holidays to the bot, follow this process:
-
-### 1. Update the Raw Data
-Add new dates or facts to `generate_dataset.py`.
-
-### 2. Extract & Normalize Facts
-Run the extraction script to build a clean JSON array of facts.
-```bash
-python scratch/extract_facts.py
-```
-
-### 3. Rebuild the Vector Embeddings
-Compute the new semantic vectors so the bot can understand them.
-```bash
-python embedder.py
-```
-
-### 4. Chat with the Bot
-Launch the standard CLI interface.
-```bash
-python chat.py
-```
+1. **Update Data**: Add facts to `generate_dataset.py`.
+2. **Rebuild DB**: 
+   ```bash
+   python scratch/extract_facts.py
+   python embedder.py
+   ```
+3. **Start Bot**: 
+   ```bash
+   python chat.py
+   ```
