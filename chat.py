@@ -5,12 +5,13 @@ import os
 import sys
 import time
 import re
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 # --- Configuration ---
 MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 EMBED_MODEL_ID = "BAAI/bge-small-en-v1.5"
+RERANK_MODEL_ID = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 THRESHOLD = 0.35
 TOP_K = 5
 
@@ -24,6 +25,9 @@ class KLETechChatbot:
     def __init__(self):
         print(f"{CLR_YELLOW}Loading SentenceTransformer model (CPU)...{CLR_RESET}")
         self.embed_model = SentenceTransformer(EMBED_MODEL_ID, device='cpu')
+        
+        print(f"{CLR_YELLOW}Loading Reranker model (CPU)...{CLR_RESET}")
+        self.rerank_model = CrossEncoder(RERANK_MODEL_ID, device='cpu')
         
         print(f"{CLR_YELLOW}Loading Knowledge Base...{CLR_RESET}")
         if not os.path.exists('embeddings.npy') or not os.path.exists('facts.json'):
@@ -253,8 +257,17 @@ class KLETechChatbot:
                     if "[HOLIDAY]" in fact_text: continue
             
             filtered_facts.append(fact_text)
-            if len(filtered_facts) >= TOP_K:
+            if len(filtered_facts) >= 20: # Collect more for reranking
                 break
+        
+        # STAGE 2: Reranking
+        if len(filtered_facts) > TOP_K:
+            # Rerank only the candidate facts against the query
+            pairs = [[query, f] for f in filtered_facts]
+            scores = self.rerank_model.predict(pairs)
+            # Sort by scores descending
+            reranked_indices = np.argsort(scores)[::-1]
+            filtered_facts = [filtered_facts[i] for i in reranked_indices[:TOP_K]]
         
         if not filtered_facts or similarities[best_indices[0]] < THRESHOLD:
             return None

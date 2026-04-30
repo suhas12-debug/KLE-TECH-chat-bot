@@ -22,14 +22,15 @@ Traditional LLMs often hallucinate dates, fees, and schedules. This system solve
 │   (e.g., 'fee', 'timetable')                   (General Query)          │
 │              │                                       │                  │
 │              ▼                                       ▼                  │
-│ [ Deterministic Bypass ]                [ Vector Search Retriever ]     │
-│  (Regex & Keyword Lock)                 (SBERT + Cosine Similarity)     │
+│ [ Deterministic Bypass ]                [ STAGE 1: Vector Search ]      │
+│  (Regex & Keyword Lock)                 (BGE-Small-v1.5 Bi-Encoder)     │
 │              │                                       │                  │
 │              ▼                                       ▼                  │
-│ [ Hard Filter: Day/Div/Sem ]               [ Retrieve Top 80 Facts ]    │
-│              │                                       │                  │
-│              ▼                                       ▼                  │
-│    [ Format Direct Fact ]                  [ Prompt Context Builder ]   │
+│ [ Hard Filter: Day/Div/Sem ]               [ STAGE 2: Reranking ]       │
+│              │                           (MiniLM-L6 Cross-Encoder)      │
+│              ▼                                       │                  │
+│    [ Format Direct Fact ]                            ▼                  │
+│              │                           [ Final Top 5 Best Facts ]     │
 │              │                                       │                  │
 │              │                                       ▼                  │
 │              │                          [ Qwen2.5-1.5B-Instruct LLM ]   │
@@ -45,7 +46,12 @@ Traditional LLMs often hallucinate dates, fees, and schedules. This system solve
 
 ## 🛡️ Recent Hardening & Accuracy Features
 
-### 1. Robust Timetable Algorithm
+### 1. Two-Stage Retrieval (Reranking)
+The bot now uses a sophisticated two-stage funnel to ensure the most relevant context is always provided to the AI:
+- **Stage 1 (Retrieval):** Uses `BAAI/bge-small-en-v1.5` to find the top 80 potentially relevant facts.
+- **Stage 2 (Reranking):** Uses a high-precision Cross-Encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score the top 20 candidates. This allows the bot to understand exactly which fact is most relevant to the user's specific question.
+
+### 2. Robust Timetable Algorithm
 The bot now implements an **Implicit Intent Detection** algorithm. 
 - **Typo Tolerance:** Specifically handles common typos like `"timeteble"` and `"time table"`.
 - **Implicit Lock:** If a **Day** (e.g., Monday) and a **Division** (e.g., D) appear in the same sentence, the bot automatically locks the search to the Academic Timetable dataset, even if the word "timetable" isn't used.
