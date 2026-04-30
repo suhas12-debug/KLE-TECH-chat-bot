@@ -4,9 +4,9 @@ import numpy as np
 import os
 
 def generate_embeddings():
-    print("Loading SentenceTransformer model ('all-MiniLM-L6-v2')...")
+    print("Loading SentenceTransformer model ('BAAI/bge-small-en-v1.5')...")
     # SBERT runs on CPU as per constraints
-    model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+    model = SentenceTransformer('BAAI/bge-small-en-v1.5', device='cpu')
     
     facts = []
     input_file = 'college_data.jsonl'

@@ -10,7 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 # --- Configuration ---
 MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-EMBED_MODEL_ID = "all-MiniLM-L6-v2"
+EMBED_MODEL_ID = "BAAI/bge-small-en-v1.5"
 THRESHOLD = 0.35
 TOP_K = 5
 
@@ -79,7 +79,10 @@ class KLETechChatbot:
 
     def retrieve(self, query):
         normalized_query = self._normalize_query(query)
-        query_emb = self.embed_model.encode([normalized_query])
+        # BGE models perform better with an instruction prefix for the query
+        instruction = "Represent this sentence for searching relevant passages: "
+        query_to_embed = instruction + normalized_query
+        query_emb = self.embed_model.encode([query_to_embed])
         # Compute cosine similarity
         similarities = np.dot(self.embeddings, query_emb.T).flatten() / (
             np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_emb)
