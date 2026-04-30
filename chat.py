@@ -163,7 +163,7 @@ class KLETechChatbot:
                 break
 
         # Get top indices
-        best_indices = np.argsort(similarities)[-30:][::-1]  # Look at top 30 for filtering
+        best_indices = np.argsort(similarities)[-80:][::-1]  # Look at top 80 for filtering
         
         filtered_facts = []
 
@@ -219,7 +219,12 @@ class KLETechChatbot:
                     continue
             
             # TIMETABLE FILTER: If they ask for a timetable, skip non-academic facts
-            is_timetable_query = any(k in q_lower for k in ["timetable", "schedule", "class"])
+            is_timetable_query = any(k in q_lower for k in ["timetable", "timeteble", "time table", "schedule", "class"])
+            
+            # If the user mentions both a day and a division, it's definitely a timetable query
+            if required_day and required_div:
+                is_timetable_query = True
+                
             if is_timetable_query and "[ACADEMIC]" not in fact_text:
                 continue
                 
