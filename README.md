@@ -102,9 +102,10 @@ Because the bot runs a 1.5B parameter model locally, it has specific resource ne
 ## 📖 How to Update & Run
 
 1. **Update Data**: Add facts to `generate_dataset.py`.
-2. **Rebuild DB**: 
+2. **Rebuild DB** (3-step build chain):
    ```bash
-   python scratch/extract_facts.py
+   python generate_dataset.py
+   python extract_facts.py
    python embedder.py
    ```
 3. **Start Bot**: 

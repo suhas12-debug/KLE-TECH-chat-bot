@@ -1,0 +1,30 @@
+name: Semgrep Security Scan
+
+# Runs automatically:
+#  - on every push to main
+#  - on every pull request targeting main
+# so code is scanned before/at the point it's merged, not manually after the fact.
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+
+jobs:
+  semgrep:
+    name: Run Semgrep static analysis
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep scan --config=auto --error
+        # --config=auto pulls Semgrep's default recommended rule sets
+        #   (security, correctness, best-practice) for whatever languages
+        #   it detects in the repo.
+        # --error makes the job fail (red X in GitHub) if any finding
+        #   is returned, so issues are visible immediately in the PR/commit
+        #   instead of silently passing.
